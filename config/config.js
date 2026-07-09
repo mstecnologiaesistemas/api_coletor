@@ -4,9 +4,14 @@ require('dotenv').config();
 // Firebase configuration must be provided via environment. Do not force defaults
 // to avoid accidentally using incomplete or placeholder credentials.
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+const rateLimitEnabled = process.env.RATE_LIMIT_ENABLED != null
+  ? String(process.env.RATE_LIMIT_ENABLED).trim().toLowerCase() === 'true'
+  : nodeEnv !== 'development';
+
 module.exports = {
   port: process.env.PORT || 3000,
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   
   // JWT Configuration
   jwt: {
@@ -24,6 +29,7 @@ module.exports = {
   
   // Rate Limiting
   rateLimit: {
+    enabled: rateLimitEnabled,
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 300, // limit each IP to 100 requests per windowMs
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers

@@ -26,8 +26,10 @@ app.use(helmet());
 app.use(cors(config.cors));
 
 // Rate limiting
-const limiter = rateLimit(config.rateLimit);
-app.use(limiter);
+if (config.rateLimit?.enabled) {
+  const limiter = rateLimit(config.rateLimit);
+  app.use(limiter);
+}
 
 // Compression middleware
 app.use(compression());
@@ -89,6 +91,7 @@ const PORT = config.port;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`📱 Ambiente: ${config.nodeEnv}`);
+  console.log(`🛡️ Rate limit: ${config.rateLimit?.enabled ? 'ativo' : 'desativado'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
 });
 
