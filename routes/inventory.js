@@ -29,6 +29,7 @@ router.use((req, res, next) => {
 router.get('/', validatePagination, validateSearch, validateNrInventarioQuery, inventoryController.getAll);
 router.post('/', validateInventoryItem, inventoryController.create);
 router.post('/sync', inventoryController.sync);
+router.get('/resultado', validateNrInventarioQuery, inventoryController.exportResultado);
 
 // Exclusão em lote por nrInventario (deve vir ANTES das rotas com :id)
 router.delete('/by-inventario', validateNrInventarioQuery, inventoryController.deleteByInventario);

@@ -90,6 +90,26 @@ function list({ nrInventario, page = 1, limit = 50, q, field, since, tenantId })
   };
 }
 
+function listByInventario(nrInventario, tenantId) {
+  if (!nrInventario) return [];
+  let rows = [];
+  if (tenantId) {
+    rows = db.prepare(`
+      SELECT inventory.* FROM inventory
+      JOIN users u ON u.id = inventory.userId
+      WHERE inventory.nrInventario = ? AND u.tenantId = ?
+      ORDER BY inventory.updatedAt DESC
+    `).all(nrInventario, tenantId);
+  } else {
+    rows = db.prepare(`
+      SELECT * FROM inventory
+      WHERE nrInventario = ?
+      ORDER BY updatedAt DESC
+    `).all(nrInventario);
+  }
+  return rows.map(toCanonicalRow);
+}
+
 function getById(id, nrInventario, tenantId) {
   let sql = 'SELECT inventory.* FROM inventory';
   const params = [];
@@ -381,6 +401,16 @@ function sync(items = [], userId, tenantId) {
   items.forEach(item => {
     const ts = nowISO();
     let existing = null;
+    const sanitizeNull = (v) => {
+      if (v === undefined || v === null) return null;
+      const s = String(v).trim();
+      return s === '' ? null : s;
+    };
+    const sanitizeUndef = (v) => {
+      if (v === undefined || v === null) return undefined;
+      const s = String(v).trim();
+      return s === '' ? undefined : s;
+    };
     if (tenantId) {
       if (item.id) existing = selectByIdTenant.get(item.id, tenantId);
       if (!existing && item.codigo) {
@@ -408,37 +438,66 @@ function sync(items = [], userId, tenantId) {
     if (existing) {
       const statusBem = existing.statusBem || '';
       if (statusBem && String(statusBem).trim().startsWith('Bem Inventariado')) {
-        // Permitir apenas atualizar inventariadoPor se vier preenchido e ainda não existir
-        const incomingInvPor = item.inventariadoPor ? firstName(String(item.inventariadoPor)) : '';
-        const existingInvPor = existing.inventariadoPor ? String(existing.inventariadoPor).trim() : '';
-        if (incomingInvPor && !existingInvPor) {
-          const tsUpdate = ts; // ts já definido acima
-          db.prepare(`
-            UPDATE inventory SET
-              inventariadoPor = ?,
-              updatedAt = ?
-            WHERE id = ?
-          `).run(incomingInvPor, tsUpdate, existing.id);
-          results.push({ id: existing.id, action: 'updated-inventariadoPor' });
-        } else {
-          results.push({ id: existing.id, action: 'skipped' });
-        }
+        const vLocNome = item.localizacaoNome && String(item.localizacaoNome).trim() !== '' ? String(item.localizacaoNome) : null;
+        const vSitNome = item.situacaoNome && String(item.situacaoNome).trim() !== '' ? String(item.situacaoNome) : null;
+        const vEstNome = item.estadoConservacaoNome && String(item.estadoConservacaoNome).trim() !== '' ? String(item.estadoConservacaoNome) : null;
+        const vObs = item.dsObservacao && String(item.dsObservacao).trim() !== '' ? String(item.dsObservacao) : null;
+        const vCdLoc = sanitizeNull(item.codigoLocalizacao);
+        const vCdSit = sanitizeNull(item.codigoSituacao);
+        const vCdEst = sanitizeNull(item.codigoEstado);
+        const vInvPor = item.inventariadoPor ? firstName(String(item.inventariadoPor)) : null;
+        db.prepare(`
+          UPDATE inventory SET
+            localizacaoNome = COALESCE(?, localizacaoNome),
+            situacaoNome = COALESCE(?, situacaoNome),
+            estadoConservacaoNome = COALESCE(?, estadoConservacaoNome),
+            dsObservacao = COALESCE(?, dsObservacao),
+            codigoLocalizacao = COALESCE(?, codigoLocalizacao),
+            codigoSituacao = COALESCE(?, codigoSituacao),
+            codigoEstado = COALESCE(?, codigoEstado),
+            inventariadoPor = COALESCE(?, inventariadoPor),
+            updatedAt = ?
+          WHERE id = ?
+        `).run(
+          vLocNome, vSitNome, vEstNome, vObs,
+          vCdLoc, vCdSit, vCdEst,
+          vInvPor,
+          ts,
+          existing.id
+        );
+        results.push({ id: existing.id, action: 'updated-inventariado' });
       } else {
+        // Sanitizar strings vazias para não apagar nomes/códigos existentes
+        const up_codigo = sanitizeUndef(item.codigo) ?? existing.codigo;
+        const up_placa = sanitizeUndef(item.placa) ?? existing.placa;
+        const up_desc = sanitizeUndef(item.descricao) ?? existing.descricao;
+        const up_locNome = sanitizeUndef(item.localizacaoNome) ?? existing.localizacaoNome;
+        const up_sitNome = sanitizeUndef(item.situacaoNome) ?? existing.situacaoNome;
+        const up_estNome = sanitizeUndef(item.estadoConservacaoNome) ?? existing.estadoConservacaoNome;
+        const up_obs = sanitizeUndef(item.dsObservacao) ?? existing.dsObservacao;
+        const up_cdLoc = sanitizeUndef(item.codigoLocalizacao) ?? existing.codigoLocalizacao;
+        const up_cdSit = sanitizeUndef(item.codigoSituacao) ?? existing.codigoSituacao;
+        const up_cdEst = sanitizeUndef(item.codigoEstado) ?? existing.codigoEstado;
+        const up_nrInv = sanitizeUndef(item.nrInventario) ?? existing.nrInventario;
+        const up_valor = (item.valorAtual !== undefined && item.valorAtual !== null) ? item.valorAtual : existing.valorAtual;
+        const up_status = sanitizeUndef(item.statusBem) ?? existing.statusBem;
+        const up_invPor = firstName(item.inventariadoPor) ?? existing.inventariadoPor;
+
         update.run(
-          item.codigo ?? existing.codigo,
-          item.placa ?? existing.placa,
-          item.descricao ?? existing.descricao,
-          item.localizacaoNome ?? existing.localizacaoNome,
-          item.situacaoNome ?? existing.situacaoNome,
-          item.estadoConservacaoNome ?? existing.estadoConservacaoNome,
-          item.dsObservacao ?? existing.dsObservacao,
-          item.codigoLocalizacao ?? existing.codigoLocalizacao,
-          item.codigoSituacao ?? existing.codigoSituacao,
-          item.codigoEstado ?? existing.codigoEstado,
-          item.nrInventario ?? existing.nrInventario,
-          item.valorAtual ?? existing.valorAtual,
-          item.statusBem ?? existing.statusBem,
-          firstName(item.inventariadoPor) ?? existing.inventariadoPor,
+          up_codigo,
+          up_placa,
+          up_desc,
+          up_locNome,
+          up_sitNome,
+          up_estNome,
+          up_obs,
+          up_cdLoc,
+          up_cdSit,
+          up_cdEst,
+          up_nrInv,
+          up_valor,
+          up_status,
+          up_invPor,
           ts,
           existing.id
         );
@@ -446,22 +505,23 @@ function sync(items = [], userId, tenantId) {
       }
     } else {
       const id = item.id || genId();
+      // Inserção com saneamento para evitar strings vazias
       insert.run(
         id, userId,
-        item.codigo ?? null,
-        item.placa ?? null,
-        item.descricao ?? null,
-        item.localizacaoNome ?? null,
-        item.situacaoNome ?? null,
-        item.estadoConservacaoNome ?? null,
-        item.dsObservacao ?? null,
-        item.codigoLocalizacao ?? null,
-        item.codigoSituacao ?? null,
-        item.codigoEstado ?? null,
-        item.nrInventario ?? null,
+        sanitizeNull(item.codigo),
+        sanitizeNull(item.placa),
+        sanitizeNull(item.descricao),
+        sanitizeNull(item.localizacaoNome),
+        sanitizeNull(item.situacaoNome),
+        sanitizeNull(item.estadoConservacaoNome),
+        sanitizeNull(item.dsObservacao),
+        sanitizeNull(item.codigoLocalizacao),
+        sanitizeNull(item.codigoSituacao),
+        sanitizeNull(item.codigoEstado),
+        sanitizeNull(item.nrInventario),
         item.valorAtual ?? null,
-        item.statusBem ?? null,
-        item.inventariadoPor ?? null,
+        sanitizeNull(item.statusBem),
+        sanitizeNull(item.inventariadoPor),
         ts, ts
       );
       results.push({ id, action: 'created' });
@@ -486,4 +546,5 @@ module.exports = {
   distinctSituacoes,
   distinctEstados,
   sync,
+  listByInventario,
 };

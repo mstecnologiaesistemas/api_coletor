@@ -376,6 +376,44 @@ class InventoryController {
       });
     }
   }
+
+  async exportResultado(req, res) {
+    try {
+      const { nrInventario } = req.query;
+      if (!nrInventario || String(nrInventario).trim() === '') {
+        return res.status(400).json({ error: 'nrInventario ausente', message: 'Informe nrInventario na query' });
+      }
+      const tenantId = req.user?.tenantId || null;
+      const rows = inventoryRepo.listByInventario(String(nrInventario).trim(), tenantId);
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(404).json({ error: 'Sem dados', message: 'Nenhum item para este inventário' });
+      }
+      const s = (v) => (v == null ? '' : String(v));
+      const padLeftZerosAny = (val, len) => {
+        const t = s(val).slice(-len);
+        return t.padStart(len, '0');
+      };
+      const padLeftZeros = (val, len) => {
+        const t = s(val).replace(/\D+/g, '').slice(-len);
+        return (''.padStart(len, '0') + t).slice(-len);
+      };
+      const lines = rows.map(r => {
+        const placa = padLeftZerosAny(r?.placa, 12);
+        const codLoc = padLeftZeros(r?.localAntigo ?? r?.codigoLocalizacao, 4);
+        const codEst = padLeftZeros(r?.codigoEstado, 2);
+        const codSit = padLeftZeros(r?.codigoSituacao, 2);
+        const codLoc2 = padLeftZeros(r?.codigoLocalizacao, 4);
+        return placa + codLoc + codEst + codSit + codLoc2;
+      });
+      const content = lines.join('\n') + '\n';
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.set('Content-Disposition', `attachment; filename="Resultado_${String(nrInventario).trim()}.txt"`);
+      return res.send(content);
+    } catch (error) {
+      console.error('Erro ao exportar Resultado.txt:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor', message: 'Falha ao gerar Resultado.txt' });
+    }
+  }
 }
 
 module.exports = new InventoryController();
