@@ -1,14 +1,44 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.0.3",
   "info": {
     "title": "Coletor Patrimonial API",
     "version": "1.0.0",
-    "description": "API backend para o aplicativo Coletor Patrimonial"
+    "description": "Documentacao OpenAPI da API do Coletor Patrimonial. A autenticacao protegida usa JWT no header `Authorization: Bearer <token>`. O token precisa conter `uid` e `tenantId` validos.",
+    "contact": {
+      "name": "Coletor Patrimonial Team"
+    }
   },
   "servers": [
     {
       "url": "http://localhost:3000",
-      "description": "Servidor de desenvolvimento"
+      "description": "Servidor local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Monitoramento basico da API e banco local"
+    },
+    {
+      "name": "Auth",
+      "description": "Autenticacao, emissao e renovacao de tokens JWT"
+    },
+    {
+      "name": "Users",
+      "description": "Perfil e exclusao do usuario autenticado"
+    },
+    {
+      "name": "Inventory",
+      "description": "Consulta, manutencao e sincronizacao de bens do inventario"
+    },
+    {
+      "name": "Catalogs",
+      "description": "Catalogos derivados dos dados do inventario"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
     }
   ],
   "components": {
@@ -16,88 +46,254 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "Token JWT retornado pelos endpoints de autenticacao."
+      }
+    },
+    "parameters": {
+      "TenantHeader": {
+        "name": "x-tenant-id",
+        "in": "header",
+        "required": false,
+        "description": "Tenant alternativo aceito no registro. Tambem pode ser enviado no corpo como `tenantId`, `tenant_id` ou `cnpj`.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "InventoryId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "ID do item de inventario.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "UserId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "ID do usuario. A API so permite excluir a propria conta autenticada.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "InventoryCode": {
+        "name": "code",
+        "in": "path",
+        "required": true,
+        "description": "Codigo ou placa do bem.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Pagina da listagem.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Quantidade maxima de itens por pagina.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 50
+        }
+      },
+      "Since": {
+        "name": "since",
+        "in": "query",
+        "required": false,
+        "description": "Filtro por data ISO8601 usando `updatedAt >= since`.",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "SearchQ": {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "description": "Prefixo de busca.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "SearchField": {
+        "name": "field",
+        "in": "query",
+        "required": false,
+        "description": "Campo pesquisado. O alias `local` mapeia para `localizacaoNome`.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "codigo",
+            "placa",
+            "descricao",
+            "local"
+          ]
+        }
+      },
+      "NrInventario": {
+        "name": "nrInventario",
+        "in": "query",
+        "required": false,
+        "description": "Numero do inventario usado para escopo de consulta, catalogos, busca por codigo e exportacao.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "NrInventarioRequired": {
+        "name": "nrInventario",
+        "in": "query",
+        "required": true,
+        "description": "Numero do inventario.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "schemas": {
-      "User": {
+      "ValidationErrorDetail": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "field"
+          },
+          "value": {
+            "nullable": true
+          },
+          "msg": {
+            "type": "string",
+            "example": "Senha deve ter pelo menos 6 caracteres"
+          },
+          "path": {
+            "type": "string",
+            "example": "password"
+          },
+          "location": {
+            "type": "string",
+            "example": "body"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Dados invalidados"
+          },
+          "message": {
+            "type": "string",
+            "example": "Verifique os dados enviados"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorDetail"
+            }
+          },
+          "stack": {
+            "type": "string",
+            "description": "Disponivel apenas em desenvolvimento."
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "OK"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptime": {
+            "type": "number",
+            "example": 1234.56
+          },
+          "environment": {
+            "type": "string",
+            "example": "development"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          }
+        }
+      },
+      "AuthUser": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "description": "ID único do usuário"
+            "example": "mcf42g8c-a1b2c3"
+          },
+          "uid": {
+            "type": "string",
+            "example": "mcf42g8c-a1b2c3"
           },
           "email": {
             "type": "string",
             "format": "email",
-            "description": "Email do usuário"
+            "example": "inventario@empresa.com.br"
           },
           "name": {
             "type": "string",
-            "description": "Nome do usuário"
+            "example": "Marcelo"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Marcelo Dev"
+          },
+          "tenantId": {
+            "type": "string",
+            "nullable": true,
+            "example": "12345678000199"
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time",
-            "description": "Data de criação"
+            "format": "date-time"
           },
           "updatedAt": {
             "type": "string",
             "format": "date-time",
-            "description": "Data de última atualização"
-          }
-        }
-      },
-      "Inventory": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "ID único do item"
-          },
-          "userId": {
-            "type": "string",
-            "description": "ID do usuário proprietário"
-          },
-          "codigo": {
-            "type": "string",
-            "description": "Código do patrimônio"
-          },
-          "placa": {
-            "type": "string",
-            "description": "Placa do patrimônio"
-          },
-          "descricao": {
-            "type": "string",
-            "description": "Descrição do item"
-          },
-          "localizacao": {
-            "type": "string",
-            "description": "Localização do item"
-          },
-          "estado": {
-            "type": "string",
-            "description": "Estado do item"
-          },
-          "observacoes": {
-            "type": "string",
-            "description": "Observações adicionais"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Data de criação"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Data de última atualização"
+            "nullable": true
           }
         }
       },
       "LoginRequest": {
         "type": "object",
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
           "email": {
             "type": "string",
@@ -107,11 +303,19 @@
             "type": "string",
             "minLength": 6
           }
+        },
+        "example": {
+          "email": "inventario@empresa.com.br",
+          "password": "123456"
         }
       },
       "RegisterRequest": {
         "type": "object",
-        "required": ["email", "password", "name"],
+        "description": "O backend exige email, senha, um nome (`name` ou `fullName`) e um tenant (`tenantId`, `tenant_id`, `cnpj` ou header `x-tenant-id`).",
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
           "email": {
             "type": "string",
@@ -124,37 +328,678 @@
           "name": {
             "type": "string",
             "minLength": 2
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 2
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "cnpj": {
+            "type": "string"
           }
+        },
+        "example": {
+          "email": "inventario@empresa.com.br",
+          "password": "123456",
+          "fullName": "Marcelo Dev",
+          "tenantId": "12345678000199"
         }
       },
       "AuthResponse": {
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
-          "token": {
-            "type": "string"
+          "message": {
+            "type": "string",
+            "example": "Login realizado com sucesso"
           },
-          "user": {
-            "$ref": "#/components/schemas/User"
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string"
+              },
+              "refreshToken": {
+                "type": "string"
+              },
+              "user": {
+                "$ref": "#/components/schemas/AuthUser"
+              }
+            }
           }
         }
       },
-      "ErrorResponse": {
+      "RefreshTokenRequest": {
+        "type": "object",
+        "required": [
+          "refreshToken"
+        ],
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+      },
+      "RefreshTokenResponse": {
         "type": "object",
         "properties": {
           "success": {
             "type": "boolean",
-            "example": false
+            "example": true
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "Token renovado com sucesso"
           },
-          "errors": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Logout realizado com sucesso"
+          }
+        }
+      },
+      "MeResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "$ref": "#/components/schemas/AuthUser"
+              },
+              "authType": {
+                "type": "string",
+                "example": "jwt"
+              }
+            }
+          }
+        }
+      },
+      "ProfileResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "object",
+                "description": "Payload bruto do token autenticado."
+              },
+              "authType": {
+                "type": "string",
+                "example": "jwt"
+              }
+            }
+          }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "description": "Envie `name` ou `fullName`.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "example": {
+          "fullName": "Marcelo Almeida"
+        }
+      },
+      "UpdateProfileResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Perfil atualizado com sucesso"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "uid": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "fullName": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "DeleteUserResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Usuario excluido com sucesso"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "firebaseDeleted": {
+                "type": "boolean",
+                "example": false
+              }
+            }
+          }
+        }
+      },
+      "CatalogItem": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "nullable": true,
+            "example": "0101"
+          },
+          "nome": {
+            "type": "string",
+            "example": "ALMOXARIFADO CENTRAL"
+          }
+        }
+      },
+      "CatalogResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
             "type": "array",
             "items": {
-              "type": "object"
+              "$ref": "#/components/schemas/CatalogItem"
+            }
+          }
+        }
+      },
+      "InventoryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "mcf42g8c-a1b2c3"
+          },
+          "codigo": {
+            "type": "string",
+            "nullable": true
+          },
+          "placa": {
+            "type": "string",
+            "nullable": true
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "localizacaoNome": {
+            "type": "string",
+            "nullable": true
+          },
+          "situacaoNome": {
+            "type": "string",
+            "nullable": true
+          },
+          "estadoConservacaoNome": {
+            "type": "string",
+            "nullable": true
+          },
+          "dsObservacao": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigoLocalizacao": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigoSituacao": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigoEstado": {
+            "type": "string",
+            "nullable": true
+          },
+          "nrInventario": {
+            "type": "string",
+            "nullable": true
+          },
+          "valorAtual": {
+            "type": "number",
+            "nullable": true,
+            "example": 2499.9
+          },
+          "inventariadoPor": {
+            "type": "string",
+            "nullable": true,
+            "example": "Marcelo"
+          },
+          "StatusBem": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bem Inventariado"
+          },
+          "statusBem": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bem Inventariado"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "example": "Bem Inventariado"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "InventoryPayload": {
+        "type": "object",
+        "description": "Payload aceito pelo backend. A API aceita tanto os nomes canonicos quanto aliases legados para localizacao, situacao, estado e observacao.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Opcional no sync para conciliacao por ID."
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "placa": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "localizacaoNome": {
+            "type": "string"
+          },
+          "localizacao": {
+            "type": "string"
+          },
+          "local": {
+            "type": "string"
+          },
+          "situacaoNome": {
+            "type": "string"
+          },
+          "situacao": {
+            "type": "string"
+          },
+          "estadoConservacaoNome": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "dsObservacao": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "observacao": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "observacoes": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "codigoLocalizacao": {
+            "type": "string"
+          },
+          "cdLocalizacao": {
+            "type": "string"
+          },
+          "codigoSituacao": {
+            "type": "string"
+          },
+          "cdSituacao": {
+            "type": "string"
+          },
+          "codigoEstado": {
+            "type": "string"
+          },
+          "cdEstadoConser": {
+            "type": "string"
+          },
+          "nrInventario": {
+            "type": "string"
+          },
+          "valorAtual": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "example": "2.499,90"
+              }
+            ]
+          },
+          "StatusBem": {
+            "type": "string"
+          },
+          "statusBem": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "inventariadoPor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "example": {
+          "codigo": "123456",
+          "placa": "000012345678",
+          "descricao": "Notebook Dell Latitude",
+          "local": "ALMOXARIFADO CENTRAL",
+          "situacao": "EM USO",
+          "estado": "BOM",
+          "observacoes": "Patrimonio localizado na prateleira 3",
+          "cdLocalizacao": "0101",
+          "cdSituacao": "01",
+          "cdEstadoConser": "01",
+          "nrInventario": "2026-0001",
+          "valorAtual": "2.499,90",
+          "statusBem": "Bem Inventariado",
+          "inventariadoPor": "Marcelo Dev"
+        }
+      },
+      "InventoryPagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 50
+          },
+          "total": {
+            "type": "integer",
+            "example": 182
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 4
+          }
+        }
+      },
+      "InventoryListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InventoryItem"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/InventoryPagination"
+              }
+            }
+          }
+        }
+      },
+      "InventorySingleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/InventoryItem"
+          }
+        }
+      },
+      "InventoryMutationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Item atualizado com sucesso"
+          },
+          "data": {
+            "$ref": "#/components/schemas/InventoryItem"
+          },
+          "skipped": {
+            "type": "boolean",
+            "description": "Pode aparecer em atualizacoes protegidas por regra de negocio.",
+            "example": false
+          }
+        }
+      },
+      "InventoryDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Item deletado com sucesso"
+          }
+        }
+      },
+      "InventoryBulkDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Itens do inventario deletados"
+          },
+          "removed": {
+            "type": "integer",
+            "example": 42
+          }
+        }
+      },
+      "InventorySyncRequest": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryPayload"
+            }
+          }
+        }
+      },
+      "InventorySyncResultItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "updated-inventariado"
+            ]
+          }
+        }
+      },
+      "InventorySyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Sincronizacao realizada com sucesso"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InventorySyncResultItem"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "example": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Falha de validacao do request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Token ausente, invalido, expirado ou sem tenant valido.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Operacao nao permitida para o usuario autenticado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso nao encontrado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Erro interno do servidor.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
             }
           }
         }
@@ -164,25 +1009,19 @@
   "paths": {
     "/health": {
       "get": {
-        "summary": "Health Check",
-        "description": "Verifica se a API está funcionando",
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health check da API",
+        "description": "Retorna status da aplicacao, uptime, ambiente e disponibilidade do banco SQLite.",
+        "security": [],
         "responses": {
           "200": {
-            "description": "API funcionando corretamente",
+            "description": "API respondendo normalmente.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  }
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -192,8 +1031,12 @@
     },
     "/api/auth/login": {
       "post": {
-        "summary": "Login do usuário",
-        "description": "Autentica usuário com email e senha",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Autenticar usuario",
+        "description": "Realiza login com email e senha. A resposta retorna `token`, `refreshToken` e os dados normalizados do usuario.",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -206,7 +1049,7 @@
         },
         "responses": {
           "200": {
-            "description": "Login realizado com sucesso",
+            "description": "Login realizado com sucesso.",
             "content": {
               "application/json": {
                 "schema": {
@@ -216,32 +1059,30 @@
             }
           },
           "400": {
-            "description": "Dados inválidos",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ValidationError"
           },
           "401": {
-            "description": "Credenciais inválidas",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
     },
     "/api/auth/register": {
       "post": {
-        "summary": "Registro de usuário",
-        "description": "Cria uma nova conta de usuário",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Registrar usuario",
+        "description": "Cria um usuario local em SQLite, tenta replicar no Firebase Admin quando configurado e devolve o par de tokens JWT.",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantHeader"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -254,7 +1095,7 @@
         },
         "responses": {
           "201": {
-            "description": "Usuário criado com sucesso",
+            "description": "Usuario criado com sucesso.",
             "content": {
               "application/json": {
                 "schema": {
@@ -264,7 +1105,10 @@
             }
           },
           "400": {
-            "description": "Dados inválidos",
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "409": {
+            "description": "Email ja cadastrado.",
             "content": {
               "application/json": {
                 "schema": {
@@ -273,378 +1117,599 @@
               }
             }
           },
-          "409": {
-            "description": "Email já cadastrado",
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh-token": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Renovar access token",
+        "description": "Recebe um `refreshToken` valido e emite um novo token de acesso.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token renovado com sucesso.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/RefreshTokenResponse"
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Encerrar sessao",
+        "description": "Endpoint de logout logico. Atualmente confirma o logout, sem blacklist persistente de token.",
+        "responses": {
+          "200": {
+            "description": "Logout confirmado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
     },
     "/api/auth/me": {
       "get": {
-        "summary": "Dados do usuário autenticado",
-        "description": "Retorna informações do usuário logado",
-        "security": [
-          {
-            "bearerAuth": []
-          }
+        "tags": [
+          "Auth"
         ],
+        "summary": "Obter usuario autenticado",
+        "description": "Busca os dados atualizados do usuario autenticado no banco e retorna tambem o tipo de autenticacao.",
         "responses": {
           "200": {
-            "description": "Dados do usuário",
+            "description": "Dados do usuario autenticado.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
+                  "$ref": "#/components/schemas/MeResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "Token inválido ou expirado",
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/users/profile": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Ler perfil bruto do token",
+        "description": "Retorna o conteudo de `req.user` e `authType` para o usuario autenticado.",
+        "responses": {
+          "200": {
+            "description": "Perfil retornado com sucesso.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "$ref": "#/components/schemas/ProfileResponse"
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Atualizar proprio perfil",
+        "description": "Atualiza o nome do usuario autenticado usando `name` ou `fullName`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Perfil atualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Excluir propria conta",
+        "description": "Remove o usuario autenticado do SQLite e tenta excluir o correspondente no Firebase quando configurado.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario excluido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/catalogs/locais": {
+      "get": {
+        "tags": [
+          "Catalogs"
+        ],
+        "summary": "Listar catalogo de locais",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/NrInventario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de locais distinta para o tenant autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/catalogs/situacoes": {
+      "get": {
+        "tags": [
+          "Catalogs"
+        ],
+        "summary": "Listar catalogo de situacoes",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/NrInventario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de situacoes distinta para o tenant autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/catalogs/estados": {
+      "get": {
+        "tags": [
+          "Catalogs"
+        ],
+        "summary": "Listar catalogo de estados de conservacao",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/NrInventario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de estados distinta para o tenant autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
     },
     "/api/inventory": {
       "get": {
-        "summary": "Lista inventários",
-        "description": "Retorna lista paginada de inventários do usuário",
-        "security": [
-          {
-            "bearerAuth": []
-          }
+        "tags": [
+          "Inventory"
         ],
+        "summary": "Listar itens do inventario",
+        "description": "Retorna uma lista paginada filtrada pelo tenant autenticado. A busca textual usa prefixo (`LIKE q%`).",
         "parameters": [
           {
-            "name": "page",
-            "in": "query",
-            "description": "Número da página",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
+            "$ref": "#/components/parameters/Page"
           },
           {
-            "name": "limit",
-            "in": "query",
-            "description": "Itens por página",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10
-            }
+            "$ref": "#/components/parameters/Limit"
           },
           {
-            "name": "search",
-            "in": "query",
-            "description": "Termo de busca",
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/Since"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQ"
+          },
+          {
+            "$ref": "#/components/parameters/SearchField"
+          },
+          {
+            "$ref": "#/components/parameters/NrInventario"
           }
         ],
         "responses": {
           "200": {
-            "description": "Lista de inventários",
+            "description": "Itens retornados com sucesso.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Inventory"
-                      }
-                    },
-                    "pagination": {
-                      "type": "object",
-                      "properties": {
-                        "page": {
-                          "type": "integer"
-                        },
-                        "limit": {
-                          "type": "integer"
-                        },
-                        "total": {
-                          "type": "integer"
-                        },
-                        "pages": {
-                          "type": "integer"
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/InventoryListResponse"
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       },
       "post": {
-        "summary": "Cria inventário",
-        "description": "Cria um novo item de inventário",
-        "security": [
-          {
-            "bearerAuth": []
-          }
+        "tags": [
+          "Inventory"
         ],
+        "summary": "Criar item de inventario",
+        "description": "Cria um novo item vinculado ao usuario autenticado. O backend normaliza aliases legados do payload.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["codigo", "descricao"],
-                "properties": {
-                  "codigo": {
-                    "type": "string"
-                  },
-                  "placa": {
-                    "type": "string"
-                  },
-                  "descricao": {
-                    "type": "string"
-                  },
-                  "localizacao": {
-                    "type": "string"
-                  },
-                  "estado": {
-                    "type": "string"
-                  },
-                  "observacoes": {
-                    "type": "string"
-                  }
-                }
+                "$ref": "#/components/schemas/InventoryPayload"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Inventário criado com sucesso",
+            "description": "Item criado com sucesso.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Inventory"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/inventory/{id}": {
-      "get": {
-        "summary": "Busca inventário por ID",
-        "description": "Retorna um item específico do inventário",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "description": "ID do inventário",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Inventário encontrado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Inventory"
-                    }
-                  }
+                  "$ref": "#/components/schemas/InventoryMutationResponse"
                 }
               }
             }
           },
-          "404": {
-            "description": "Inventário não encontrado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "summary": "Atualiza inventário",
-        "description": "Atualiza um item do inventário",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "description": "ID do inventário",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "codigo": {
-                    "type": "string"
-                  },
-                  "placa": {
-                    "type": "string"
-                  },
-                  "descricao": {
-                    "type": "string"
-                  },
-                  "localizacao": {
-                    "type": "string"
-                  },
-                  "estado": {
-                    "type": "string"
-                  },
-                  "observacoes": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Inventário atualizado com sucesso",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Inventory"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Remove inventário",
-        "description": "Remove um item do inventário",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "description": "ID do inventário",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Inventário removido com sucesso",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Inventário removido com sucesso"
-                    }
-                  }
-                }
-              }
-            }
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }
     },
     "/api/inventory/sync": {
       "post": {
-        "summary": "Sincronização em lote",
-        "description": "Sincroniza múltiplos itens de inventário",
-        "security": [
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Sincronizar itens em lote",
+        "description": "Recebe um array de itens e realiza conciliacao por `id`, `codigo` ou `placa`, sempre respeitando o escopo do tenant autenticado.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventorySyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sincronizacao concluida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventorySyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/inventory/resultado": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Exportar Resultado.txt",
+        "description": "Gera um arquivo texto no formato esperado pelo processo de inventario. Exige `nrInventario`.",
+        "parameters": [
           {
-            "bearerAuth": []
+            "$ref": "#/components/parameters/NrInventarioRequired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Arquivo texto gerado.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "000012345678010101010101\n"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/inventory/by-inventario": {
+      "delete": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Excluir itens por numero de inventario",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/NrInventarioRequired"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Itens removidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryBulkDeleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/inventory/tenant": {
+      "delete": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Excluir todos os itens do tenant atual",
+        "description": "Remove todos os itens vinculados ao `tenantId` presente no token e registra auditoria.",
+        "responses": {
+          "200": {
+            "description": "Itens do tenant removidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryBulkDeleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/inventory/{id}": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Obter item por ID",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryId"
+          },
+          {
+            "$ref": "#/components/parameters/NrInventario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventorySingleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Atualizar item por ID",
+        "description": "Atualiza um item existente. Se o bem ja estiver inventariado, a regra de negocio preserva os campos estruturais e permite apenas campos controlados.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryId"
+          },
+          {
+            "$ref": "#/components/parameters/NrInventario"
           }
         ],
         "requestBody": {
@@ -652,72 +1717,157 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "codigo": {
-                          "type": "string"
-                        },
-                        "placa": {
-                          "type": "string"
-                        },
-                        "descricao": {
-                          "type": "string"
-                        },
-                        "localizacao": {
-                          "type": "string"
-                        },
-                        "estado": {
-                          "type": "string"
-                        },
-                        "observacoes": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
+                "$ref": "#/components/schemas/InventoryPayload"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Sincronização realizada com sucesso",
+            "description": "Item atualizado.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "created": {
-                          "type": "integer",
-                          "description": "Número de itens criados"
-                        },
-                        "updated": {
-                          "type": "integer",
-                          "description": "Número de itens atualizados"
-                        },
-                        "errors": {
-                          "type": "array",
-                          "description": "Lista de erros ocorridos"
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/InventoryMutationResponse"
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Excluir item por ID",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item removido com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryDeleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/inventory/code/{code}": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Obter item por codigo ou placa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryCode"
+          },
+          {
+            "$ref": "#/components/parameters/NrInventario"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventorySingleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "Atualizar item por codigo ou placa",
+        "description": "Localiza um item por `codigo` ou `placa` e aplica a mesma regra de negocio da atualizacao por ID.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryCode"
+          },
+          {
+            "$ref": "#/components/parameters/NrInventario"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item atualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
           }
         }
       }

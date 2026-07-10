@@ -48,6 +48,7 @@ Crie um arquivo `.env` dentro da pasta `api` com base no exemplo abaixo.
 PORT=3000
 NODE_ENV=development
 
+# Obrigatorio: defina uma chave forte e unica. O valor de exemplo abaixo e invalido.
 JWT_SECRET=troque-esta-chave-em-producao
 JWT_EXPIRES_IN=24h
 JWT_REFRESH_EXPIRES_IN=7d
@@ -74,7 +75,7 @@ FIREBASE_DATABASE_URL=
 | --- | --- | --- |
 | `PORT` | Nao | Porta do servidor. Padrao: `3000`. |
 | `NODE_ENV` | Nao | Ambiente de execucao. Use `development` localmente. |
-| `JWT_SECRET` | Sim em producao | Chave usada para assinar os tokens JWT. |
+| `JWT_SECRET` | Sim | Chave usada para assinar os tokens JWT. A API nao inicia sem esse valor no `.env`. |
 | `JWT_EXPIRES_IN` | Nao | Expiracao do token de acesso. Padrao: `24h`. |
 | `JWT_REFRESH_EXPIRES_IN` | Nao | Expiracao do refresh token. Padrao: `7d`. |
 | `CORS_ORIGIN` | Nao | Origem liberada no CORS. Padrao: `*`. |
@@ -107,6 +108,17 @@ npm start
 cd api
 npm test
 ```
+
+## Documentacao OpenAPI (Swagger)
+
+Com a API em execucao, a documentacao fica disponivel em:
+
+- Swagger UI: `http://localhost:3000/api/docs`
+- Spec OpenAPI JSON: `http://localhost:3000/api/docs/openapi.json`
+
+O arquivo-fonte da especificacao versionada no projeto e:
+
+- `api/api-docs.json`
 
 ## Banco de dados
 
@@ -226,7 +238,7 @@ curl http://localhost:3000/health
 
 ## Observacoes importantes
 
-- Em producao, troque obrigatoriamente o valor de `JWT_SECRET`.
+- A API nao inicia se `JWT_SECRET` estiver ausente ou ainda com o placeholder `troque-esta-chave-em-producao`.
 - Recomenda-se definir explicitamente `DB_PATH` no `.env`.
 - As rotas de inventario, catalogos e usuarios exigem autenticacao.
-- Existe um arquivo `api-docs.json` no projeto que pode ser usado como referencia adicional da API.
+- A UI Swagger consome a especificacao versionada em `api/api-docs.json`.

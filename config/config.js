@@ -1,8 +1,18 @@
 // api/config/config.js
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({
+  path: path.resolve(__dirname, '..', '.env')
+});
 
 // Firebase configuration must be provided via environment. Do not force defaults
 // to avoid accidentally using incomplete or placeholder credentials.
+const jwtSecret = String(process.env.JWT_SECRET || '').trim();
+
+if (!jwtSecret || jwtSecret === 'troque-esta-chave-em-producao') {
+  throw new Error(
+    'JWT_SECRET obrigatorio. Defina uma chave forte no arquivo api/.env antes de iniciar a API.'
+  );
+}
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 const rateLimitEnabled = process.env.RATE_LIMIT_ENABLED != null
@@ -15,7 +25,7 @@ module.exports = {
   
   // JWT Configuration
   jwt: {
-    secret: process.env.JWT_SECRET || 'coletor-patrimonial-secret-key-2024',
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
     // Prazo de expiração do refresh token
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'

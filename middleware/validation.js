@@ -131,8 +131,8 @@ const validateInventoryUpdate = [
 // Validações para parâmetros de rota
 const validateId = [
   param('id')
-    .isInt({ min: 1 })
-    .withMessage('ID deve ser um número inteiro positivo'),
+    .isLength({ min: 1 })
+    .withMessage('ID não pode estar vazio'),
   handleValidationErrors
 ];
 

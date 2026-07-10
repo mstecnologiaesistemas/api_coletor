@@ -1,4 +1,5 @@
 // api/src/server.js
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -45,8 +46,19 @@ if (config.nodeEnv === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Swagger UI usa assets externos e script inline; liberamos apenas na rota de docs.
+app.use('/api/docs', (req, res, next) => {
+  res.removeHeader('Content-Security-Policy');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self';"
+  );
+  next();
+});
+
 // Health check endpoint
 const { isDbAvailable } = require('../db/sqlite');
+const openApiSpec = require('../api-docs.json');
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
@@ -55,6 +67,14 @@ app.get('/health', (req, res) => {
     environment: config.nodeEnv,
     database: isDbAvailable() ? 'available' : 'unavailable'
   });
+});
+
+app.get('/api/docs/openapi.json', (req, res) => {
+  res.status(200).json(openApiSpec);
+});
+
+app.get('/api/docs', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'docs', 'swagger-ui.html'));
 });
 
 // API Routes
