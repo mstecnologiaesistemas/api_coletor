@@ -35,6 +35,8 @@ router.get('/resultado', validateNrInventarioQuery, inventoryController.exportRe
 router.delete('/by-inventario', validateNrInventarioQuery, inventoryController.deleteByInventario);
 // Exclusão de todos os itens do tenant atual (CNPJ)
 router.delete('/tenant', inventoryController.deleteAllForTenant);
+// Exclusão global protegida por chave administrativa
+router.delete('/all', inventoryController.deleteAllGlobal);
 
 // Rotas por ID
 router.get('/:id', validateId, validateNrInventarioQuery, inventoryController.getById);

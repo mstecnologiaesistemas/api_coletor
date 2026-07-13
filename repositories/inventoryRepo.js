@@ -292,6 +292,11 @@ function deleteAllByTenant(tenantId) {
   return res.changes || 0;
 }
 
+function deleteAll() {
+  const res = db.prepare('DELETE FROM inventory').run();
+  return res.changes || 0;
+}
+
 function deleteByUserId(userId) {
   try {
     const res = db.prepare('DELETE FROM inventory WHERE userId = ?').run(userId);
@@ -542,6 +547,7 @@ module.exports = {
   deleteByInventario,
   deleteByUserId,
   deleteAllByTenant,
+  deleteAll,
   distinctLocais,
   distinctSituacoes,
   distinctEstados,

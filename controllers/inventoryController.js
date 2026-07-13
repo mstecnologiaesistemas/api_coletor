@@ -1,6 +1,7 @@
 // api/controllers/inventoryController.js
 const inventoryRepo = require('../repositories/inventoryRepo');
 const { addAuditLog, nowISO } = require('../db/sqlite');
+const config = require('../config/config');
 
 // ----------------------- Helpers de normalização -----------------------
 // Remover chaves com undefined (Firestore não aceita valores undefined)
@@ -373,6 +374,51 @@ class InventoryController {
       res.status(500).json({
         error: 'Erro interno do servidor',
         message: 'Erro ao sincronizar itens'
+      });
+    }
+  }
+
+  async deleteAllGlobal(req, res) {
+    try {
+      const configuredSecret = String(config.security?.globalPurgeSecret || '').trim();
+      if (!configuredSecret) {
+        return res.status(503).json({
+          error: 'Limpeza global indisponível',
+          message: 'GLOBAL_PURGE_SECRET não está configurado no servidor'
+        });
+      }
+
+      const providedSecret = String(req.headers['x-admin-purge-secret'] || '').trim();
+      if (!providedSecret || providedSecret !== configuredSecret) {
+        return res.status(403).json({
+          error: 'Operação não autorizada',
+          message: 'Chave administrativa inválida para limpeza global'
+        });
+      }
+
+      const removed = inventoryRepo.deleteAll();
+      try {
+        addAuditLog({
+          tenantId: req.user?.tenantId ? String(req.user.tenantId) : null,
+          email: req.user?.email || null,
+          action: 'PURGE_ALL_INVENTORY_DATA',
+          count: Number.isFinite(removed) ? removed : null,
+          origin: 'api',
+          details: { path: req?.originalUrl || '/api/inventory/all', ip: req?.ip },
+          createdAt: nowISO(),
+        });
+      } catch {}
+
+      return res.json({
+        success: true,
+        message: 'Todos os itens de inventário da API foram deletados',
+        removed,
+      });
+    } catch (error) {
+      console.error('Erro ao deletar toda a base de inventário:', error);
+      return res.status(500).json({
+        error: 'Erro interno do servidor',
+        message: 'Erro ao deletar toda a base de inventário'
       });
     }
   }

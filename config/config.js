@@ -7,6 +7,11 @@ require('dotenv').config({
 // Firebase configuration must be provided via environment. Do not force defaults
 // to avoid accidentally using incomplete or placeholder credentials.
 const jwtSecret = String(process.env.JWT_SECRET || '').trim();
+const globalPurgeSecret = String(process.env.GLOBAL_PURGE_SECRET || '').trim();
+const dbPathRaw = String(process.env.DB_PATH || './data/database.sqlite').trim() || './data/database.sqlite';
+const dbPath = path.isAbsolute(dbPathRaw)
+  ? dbPathRaw
+  : path.resolve(__dirname, '..', dbPathRaw);
 
 if (!jwtSecret || jwtSecret === 'troque-esta-chave-em-producao') {
   throw new Error(
@@ -62,12 +67,17 @@ module.exports = {
   // Database Configuration (for future SQLite integration)
   database: {
     type: 'sqlite',
-    path: process.env.DB_PATH || '/data/database.sqlite'
+    path: dbPath
   },
 
   // Firebase Configuration
   firebase: {
     credentialsPath: process.env.FIREBASE_CREDENTIALS_PATH,
     databaseURL: process.env.FIREBASE_DATABASE_URL
+  },
+
+  // Administrative security configuration
+  security: {
+    globalPurgeSecret
   }
 };

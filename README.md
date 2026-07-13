@@ -53,6 +53,9 @@ JWT_SECRET=troque-esta-chave-em-producao
 JWT_EXPIRES_IN=24h
 JWT_REFRESH_EXPIRES_IN=7d
 
+# Obrigatorio para habilitar a limpeza global protegida via /api/inventory/all
+GLOBAL_PURGE_SECRET=defina-uma-chave-administrativa-forte
+
 CORS_ORIGIN=*
 
 # Recomenda-se usar caminho relativo a partir da pasta /api
@@ -78,6 +81,7 @@ FIREBASE_DATABASE_URL=
 | `JWT_SECRET` | Sim | Chave usada para assinar os tokens JWT. A API nao inicia sem esse valor no `.env`. |
 | `JWT_EXPIRES_IN` | Nao | Expiracao do token de acesso. Padrao: `24h`. |
 | `JWT_REFRESH_EXPIRES_IN` | Nao | Expiracao do refresh token. Padrao: `7d`. |
+| `GLOBAL_PURGE_SECRET` | Sim, para purge global | Chave administrativa exigida pela rota `DELETE /api/inventory/all` no header `x-admin-purge-secret`. Sem ela, a limpeza global permanece indisponivel. |
 | `CORS_ORIGIN` | Nao | Origem liberada no CORS. Padrao: `*`. |
 | `DB_PATH` | Recomendado | Caminho do arquivo SQLite. Recomendado: `./data/database.sqlite`. |
 | `RATE_LIMIT_ENABLED` | Nao | Liga ou desliga o rate limit manualmente. |
@@ -239,6 +243,7 @@ curl http://localhost:3000/health
 ## Observacoes importantes
 
 - A API nao inicia se `JWT_SECRET` estiver ausente ou ainda com o placeholder `troque-esta-chave-em-producao`.
+- A rota `DELETE /api/inventory/all` exige autenticacao JWT e tambem o header `x-admin-purge-secret` com o valor de `GLOBAL_PURGE_SECRET`.
 - Recomenda-se definir explicitamente `DB_PATH` no `.env`.
 - As rotas de inventario, catalogos e usuarios exigem autenticacao.
 - A UI Swagger consome a especificacao versionada em `api/api-docs.json`.
