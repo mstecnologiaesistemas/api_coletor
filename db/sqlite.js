@@ -16,7 +16,7 @@ function ensureDirExists(filePath) {
 
 function init() {
   try {
-    const dbPath = path.resolve(process.cwd(), config.database.path);
+    const dbPath = config.database.path;
     ensureDirExists(dbPath);
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');

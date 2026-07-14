@@ -1,5 +1,5 @@
 // api/src/server.js
-const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -8,6 +8,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const config = require('../config/config');
+const { resolveProjectPath } = require('../config/runtimePaths');
 
 // Importar rotas
 const authRoutes = require('../routes/auth');
@@ -74,7 +75,9 @@ app.get('/api/docs/openapi.json', (req, res) => {
 });
 
 app.get('/api/docs', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'docs', 'swagger-ui.html'));
+  const docsHtmlPath = resolveProjectPath('src', 'docs', 'swagger-ui.html');
+  const docsHtml = fs.readFileSync(docsHtmlPath, 'utf8');
+  res.type('html').send(docsHtml);
 });
 
 // API Routes

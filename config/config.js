@@ -1,7 +1,9 @@
 // api/config/config.js
 const path = require('path');
+const { resolveRuntimePath } = require('./runtimePaths');
+
 require('dotenv').config({
-  path: path.resolve(__dirname, '..', '.env')
+  path: resolveRuntimePath('.env')
 });
 
 // Firebase configuration must be provided via environment. Do not force defaults
@@ -11,7 +13,7 @@ const globalPurgeSecret = String(process.env.GLOBAL_PURGE_SECRET || '').trim();
 const dbPathRaw = String(process.env.DB_PATH || './data/database.sqlite').trim() || './data/database.sqlite';
 const dbPath = path.isAbsolute(dbPathRaw)
   ? dbPathRaw
-  : path.resolve(__dirname, '..', dbPathRaw);
+  : resolveRuntimePath(dbPathRaw);
 
 if (!jwtSecret || jwtSecret === 'troque-esta-chave-em-producao') {
   throw new Error(

@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "API Backend para o Coletor de Dados Patrimoniais",
   "main": "src/server.js",
+  "bin": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest"
+    "test": "jest",
+    "build:exe": "pkg . --targets node18-win-x64 --out-path dist",
+    "build:exe:all": "pkg . --targets node18-win-x64,node18-linux-x64,node18-macos-x64 --out-path dist"
   },
   "keywords": [
     "api",
@@ -35,9 +38,30 @@
   "devDependencies": {
     "jest": "^29.7.0",
     "nodemon": "^3.0.2",
+    "pkg": "^5.8.1",
     "supertest": "^6.3.3"
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "pkg": {
+    "scripts": [
+      "config/**/*.js",
+      "controllers/**/*.js",
+      "db/**/*.js",
+      "middleware/**/*.js",
+      "repositories/**/*.js",
+      "routes/**/*.js",
+      "src/**/*.js"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist",
+    "assets": [
+      "api-docs.json",
+      "src/docs/**/*",
+      "node_modules/better-sqlite3/build/Release/*.node"
+    ]
   }
 }

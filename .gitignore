@@ -10,6 +10,8 @@ node_modules/
 .env.development
 .env.production
 .env.test
+Publicar_Versão.bat
+
 
 # Logs e debug
 logs/
@@ -28,6 +30,8 @@ dist/
 build/
 coverage/
 .nyc_output/
+dist-test/
+dist-nb/
 
 # Caches
 .eslintcache
