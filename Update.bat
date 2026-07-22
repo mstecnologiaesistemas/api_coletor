@@ -13,6 +13,9 @@ set "URL=https://github.com/mstecnologiaesistemas/api_coletor/archive/refs/heads
 
 set "DESTINO=%~dp0"
 
+:: Remove a barra final
+if "%DESTINO:~-1%"=="\" set "DESTINO=%DESTINO:~0,-1%"
+
 set "TEMP=%TEMP%\ApiColetor_Update"
 
 set "ZIP=%TEMP%\api.zip"
@@ -107,7 +110,7 @@ if not exist "%ORIGEM%" (
 :: REMOVER ATRIBUTO SOMENTE LEITURA
 ::=====================================================
 
-attrib -R "%DESTINO%\*" /S >nul 2>&1
+attrib -R "%DESTINO%\*.*" /S /D >nul 2>&1
 
 ::=====================================================
 :: COPIAR ARQUIVOS
@@ -117,15 +120,15 @@ echo.
 echo Atualizando arquivos...
 
 robocopy "%ORIGEM%" "%DESTINO%" ^
-/MIR ^
-/R:2 ^
-/W:2 ^
-/FFT ^
-/Z ^
-/COPY:DAT ^
-/DCOPY:DAT ^
-/XD ".git" "logs" "data" ^
-/XF ".env" "config.json" "Atualizacao.log"
+ /MIR ^
+ /R:2 ^
+ /W:2 ^
+ /FFT ^
+ /Z ^
+ /COPY:DAT ^
+ /DCOPY:DAT ^
+ /XD ".git" "logs" "data" ^
+ /XF ".env" "config.json" "Atualizacao.log" "Update.bat"
 
 set RC=%ERRORLEVEL%
 
