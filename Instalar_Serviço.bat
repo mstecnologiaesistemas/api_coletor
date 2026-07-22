@@ -1,11 +1,11 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-title Instalador - Servico Coletor
+title Instalador do Servico Coletor
 
-::====================================================
+::=========================================================
 :: CONFIGURACOES
-::====================================================
+::=========================================================
 
 set "SERVICE_NAME=coletor"
 set "BASE_DIR=%~dp0"
@@ -14,44 +14,38 @@ set "NODE_INSTALLER=%BASE_DIR%node.msi"
 set "LOG_DIR=%BASE_DIR%logs"
 
 echo.
-echo ==========================================================
-echo           INSTALADOR DO SERVICO COLETOR
-echo ==========================================================
+echo ======================================================
+echo        INSTALADOR DO SERVICO COLETOR
+echo ======================================================
 echo.
 
-::====================================================
-:: VERIFICAR PRIVILEGIOS
-::====================================================
+::=========================================================
+:: VERIFICAR ADMINISTRADOR
+::=========================================================
 
 net session >nul 2>&1
 
-if not "%errorlevel%"=="0" (
+if not %errorlevel%==0 (
     echo.
-    echo ERRO:
-    echo Execute este arquivo como ADMINISTRADOR.
-    echo.
+    echo Execute este arquivo como Administrador.
     pause
     exit /b 1
 )
 
-::====================================================
+::=========================================================
 :: VERIFICAR NSSM
-::====================================================
+::=========================================================
 
 if not exist "%NSSM%" (
-
     echo.
-    echo ERRO:
-    echo nssm.exe nao encontrado.
-    echo.
+    echo ERRO: nssm.exe nao encontrado.
     pause
     exit /b 1
-
 )
 
-::====================================================
+::=========================================================
 :: VERIFICAR NODE
-::====================================================
+::=========================================================
 
 where node >nul 2>&1
 
@@ -62,10 +56,7 @@ if errorlevel 1 (
 
     if exist "%NODE_INSTALLER%" (
 
-        echo.
         echo Instalando Node.js...
-        echo Aguarde...
-
         msiexec /i "%NODE_INSTALLER%" /qn /norestart
 
         timeout /t 10 >nul
@@ -77,11 +68,7 @@ if errorlevel 1 (
         echo.
         echo ERRO:
         echo Node.js nao instalado.
-        echo.
-        echo Coloque o arquivo:
-        echo node.msi
-        echo na mesma pasta deste instalador.
-        echo.
+        echo Coloque o arquivo node.msi na mesma pasta.
         pause
         exit /b 1
 
@@ -89,136 +76,86 @@ if errorlevel 1 (
 
 )
 
-::====================================================
-:: LOCALIZAR NODE
-::====================================================
+::=========================================================
+:: LOCALIZAR NODE.EXE
+::=========================================================
 
-set NODE_EXE=
+set "NODE_EXE="
 
 for /f "delims=" %%i in ('where node') do (
-    set NODE_EXE=%%i
-    goto NodeFound
+    set "NODE_EXE=%%i"
+    goto NODEFOUND
 )
 
-:NodeFound
+:NODEFOUND
 
 if "%NODE_EXE%"=="" (
-
     if exist "C:\Program Files\nodejs\node.exe" (
-        set NODE_EXE=C:\Program Files\nodejs\node.exe
+        set "NODE_EXE=C:\Program Files\nodejs\node.exe"
     )
-
 )
 
 if not exist "%NODE_EXE%" (
-
     echo.
-    echo Nao foi possivel localizar o node.exe
+    echo ERRO: node.exe nao encontrado.
     pause
     exit /b 1
-
 )
 
-echo Node localizado:
+echo.
+echo Node localizado em:
 echo %NODE_EXE%
 
-::====================================================
-:: LOCALIZAR NPM
-::====================================================
-
-set NPM_CMD=
-
-for /f "delims=" %%i in ('where npm.cmd') do (
-    set NPM_CMD=%%i
-    goto NpmFound
-)
-
-:NpmFound
-
-if "%NPM_CMD%"=="" (
-
-    if exist "C:\Program Files\nodejs\npm.cmd" (
-        set NPM_CMD=C:\Program Files\nodejs\npm.cmd
-    )
-
-)
-
-if not exist "%NPM_CMD%" (
-
-    echo.
-    echo npm.cmd nao encontrado.
-    pause
-    exit /b 1
-
-)
-
-echo npm localizado:
-echo %NPM_CMD%
-
-::====================================================
+::=========================================================
 :: VERIFICAR package.json
-::====================================================
+::=========================================================
 
 if not exist "%BASE_DIR%package.json" (
-
     echo.
     echo package.json nao encontrado.
     pause
     exit /b 1
-
 )
 
-::====================================================
+::=========================================================
 :: INSTALAR DEPENDENCIAS
-::====================================================
+::=========================================================
 
 echo.
-echo ==========================================================
-echo INSTALANDO DEPENDENCIAS
-echo ==========================================================
+echo Instalando dependencias...
 
 pushd "%BASE_DIR%"
 
-call "%NPM_CMD%" install
+call npm install
 
 if errorlevel 1 (
-
     echo.
-    echo Falha durante npm install
+    echo Erro ao executar npm install.
     popd
     pause
     exit /b 1
-
 )
-
-echo.
-echo Dependencias instaladas.
-
-echo.
-echo Executando npm audit fix...
-
-call "%NPM_CMD%" audit fix
 
 popd
 
-::====================================================
-:: CRIAR PASTA LOGS
-::====================================================
+echo Dependencias instaladas.
 
-if not exist "%LOG_DIR%" (
-    mkdir "%LOG_DIR%"
-)
+::=========================================================
+:: CRIAR LOGS
+::=========================================================
 
-::====================================================
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+::=========================================================
 :: REMOVER SERVICO ANTIGO
-::====================================================
+::=========================================================
 
 sc query "%SERVICE_NAME%" >nul 2>&1
 
 if not errorlevel 1 (
 
     echo.
-    echo Removendo servico antigo...
+    echo Removendo servico existente...
 
     net stop "%SERVICE_NAME%" >nul 2>&1
 
@@ -228,30 +165,30 @@ if not errorlevel 1 (
 
 )
 
-::====================================================
+::=========================================================
 :: CRIAR SERVICO
-::====================================================
+::=========================================================
 
 echo.
 echo Criando servico...
 
-"%NSSM%" install "%SERVICE_NAME%" "%NPM_CMD%" start
+"%NSSM%" install "%SERVICE_NAME%" "%NODE_EXE%" "src\server.js"
+
+::=========================================================
+:: CONFIGURACOES DO NSSM
+::=========================================================
 
 "%NSSM%" set "%SERVICE_NAME%" AppDirectory "%BASE_DIR%"
 
-"%NSSM%" set "%SERVICE_NAME%" Start SERVICE_AUTO_START
+"%NSSM%" set "%SERVICE_NAME%" DisplayName "Coletor"
 
-::====================================================
-:: RECUPERACAO
-::====================================================
+"%NSSM%" set "%SERVICE_NAME%" Description "API Coletor"
 
-"%NSSM%" set "%SERVICE_NAME%" AppExit Default Restart
+"%NSSM%" set "%SERVICE_NAME%" Start SERVICE_AUTO_START"
 
-sc failure "%SERVICE_NAME%" reset= 0 actions= restart/5000/restart/5000/restart/5000
-
-::====================================================
+::=========================================================
 :: LOGS
-::====================================================
+::=========================================================
 
 "%NSSM%" set "%SERVICE_NAME%" AppStdout "%LOG_DIR%\stdout.log"
 
@@ -263,9 +200,17 @@ sc failure "%SERVICE_NAME%" reset= 0 actions= restart/5000/restart/5000/restart/
 
 "%NSSM%" set "%SERVICE_NAME%" AppRotateBytes 10485760
 
-::====================================================
+::=========================================================
+:: RECUPERACAO
+::=========================================================
+
+"%NSSM%" set "%SERVICE_NAME%" AppExit Default Restart
+
+sc failure "%SERVICE_NAME%" reset=0 actions=restart/5000/restart/5000/restart/5000
+
+::=========================================================
 :: INICIAR SERVICO
-::====================================================
+::=========================================================
 
 echo.
 echo Iniciando servico...
@@ -276,6 +221,7 @@ if errorlevel 1 (
 
     echo.
     echo O servico foi criado, mas nao iniciou.
+    echo.
     echo Consulte:
     echo %LOG_DIR%\stderr.log
     echo.
@@ -285,17 +231,14 @@ if errorlevel 1 (
 )
 
 echo.
-echo ==========================================================
-echo INSTALACAO CONCLUIDA COM SUCESSO
-echo ==========================================================
+echo ======================================================
+echo SERVICO INSTALADO COM SUCESSO
+echo ======================================================
 echo.
-echo Servico........: %SERVICE_NAME%
-echo Diretorio......: %BASE_DIR%
-echo Node...........: %NODE_EXE%
-echo NPM............: %NPM_CMD%
-echo Logs...........: %LOG_DIR%
-echo.
-echo O servico sera iniciado automaticamente junto com o Windows.
+echo Nome.................: %SERVICE_NAME%
+echo Node.................: %NODE_EXE%
+echo Diretorio da API.....: %BASE_DIR%
+echo Executavel...........: src\server.js
 echo.
 
 pause
