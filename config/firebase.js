@@ -4,11 +4,9 @@ const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
-// Inicializar Firebase Admin SDK via variáveis de ambiente
-// Opções suportadas:
-// - FIREBASE_SERVICE_ACCOUNT_JSON: conteúdo JSON completo inline
+// Inicializar Firebase Admin SDK usando somente o caminho definido no api/.env
+// Variável obrigatória:
 // - FIREBASE_CREDENTIALS_PATH: caminho absoluto/relativo para o arquivo JSON
-// - GOOGLE_APPLICATION_CREDENTIALS: caminho padrão suportado pelo SDK
 let serviceAccount = null;
 let usingServiceAccount = false;
 
@@ -28,88 +26,36 @@ function isValidServiceAccount(json) {
   return pk && pk.includes('BEGIN PRIVATE KEY');
 }
 
-// Tentar ler conteúdo inline
-if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+function tryUseServiceAccount(raw, sourceLabel) {
+  if (raw && raw.private_key) raw.private_key = normalizePrivateKey(raw.private_key);
+  if (!isValidServiceAccount(raw)) return false;
+  serviceAccount = raw;
+  usingServiceAccount = true;
+  console.log('Firebase: credenciais carregadas de', sourceLabel);
+  return true;
+}
+
+function tryLoadServiceAccountFile(filePath) {
   try {
-    const raw = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    // Normalizar private_key vinda de env
-    if (raw && raw.private_key) raw.private_key = normalizePrivateKey(raw.private_key);
-    if (isValidServiceAccount(raw)) {
-      serviceAccount = raw;
-      usingServiceAccount = true;
-      console.log('Firebase: credenciais carregadas de FIREBASE_SERVICE_ACCOUNT_JSON');
-    } else {
-      console.error('Firebase: JSON de service account inválido ou incompleto em FIREBASE_SERVICE_ACCOUNT_JSON');
-    }
+    if (!filePath || !fs.existsSync(filePath)) return false;
+    const json = fs.readFileSync(filePath, 'utf8');
+    const raw = JSON.parse(json);
+    return tryUseServiceAccount(raw, filePath);
   } catch (e) {
-    console.error('FIREBASE_SERVICE_ACCOUNT_JSON inválido:', e.message);
+    console.error('Erro ao ler credenciais do Firebase em', filePath, '-', e.message);
+    return false;
   }
 }
 
-// Se não houver inline, tentar por caminho
-if (!serviceAccount) {
-  const credPath = process.env.FIREBASE_CREDENTIALS_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath) {
-    try {
-      const resolved = path.isAbsolute(credPath) ? credPath : path.resolve(process.cwd(), credPath);
-      const json = fs.readFileSync(resolved, 'utf8');
-      const raw = JSON.parse(json);
-      if (raw && raw.private_key) raw.private_key = normalizePrivateKey(raw.private_key);
-      if (isValidServiceAccount(raw)) {
-        serviceAccount = raw;
-        usingServiceAccount = true;
-        console.log('Firebase: credenciais carregadas de', resolved);
-      } else {
-        console.error('Firebase: arquivo de credenciais inválido ou incompleto em', resolved);
-      }
-    } catch (e) {
-      console.error('Erro ao ler credenciais do Firebase em', credPath, '-', e.message);
-    }
-  }
-}
-
-// Fallback adicional: tentar localizar arquivo padrão no repositório raiz
-if (!serviceAccount) {
-  // Varredura de diretórios para localizar qualquer JSON válido de service account
-  const candidateDirs = [
-    path.resolve(__dirname, '..'),
-    path.resolve(__dirname, '../src'),
-    process.cwd(),
-    path.resolve(process.cwd(), 'api'),
-    path.resolve(process.cwd(), 'api/src')
-  ];
-
-  function tryLoadServiceAccountFromDir(dir) {
-    try {
-      if (!fs.existsSync(dir)) return false;
-      const files = fs.readdirSync(dir);
-      for (const f of files) {
-        if (!f.toLowerCase().endsWith('.json')) continue;
-        const full = path.join(dir, f);
-        try {
-          const json = fs.readFileSync(full, 'utf8');
-          const raw = JSON.parse(json);
-          if (raw && raw.private_key) raw.private_key = normalizePrivateKey(raw.private_key);
-          if (isValidServiceAccount(raw)) {
-            // Preferir arquivos com prefixo do projeto, se disponível
-            const preferred = /coletoroficial-firebase-adminsdk-fbsvc/i.test(f);
-            serviceAccount = raw;
-            usingServiceAccount = true;
-            console.log('Firebase: credenciais encontradas via varredura em', full, preferred ? '(preferido)' : '');
-            return true;
-          }
-        } catch (_e) {
-          // ignorar erros por arquivo não ser JSON válido
-        }
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  for (const dir of candidateDirs) {
-    if (tryLoadServiceAccountFromDir(dir)) break;
+const credPath = String(process.env.FIREBASE_CREDENTIALS_PATH || '').trim();
+if (!credPath) {
+  console.error('Firebase: FIREBASE_CREDENTIALS_PATH não definido no api/.env');
+} else {
+  const resolved = path.isAbsolute(credPath) ? credPath : path.resolve(process.cwd(), credPath);
+  if (!fs.existsSync(resolved)) {
+    console.error('Firebase: arquivo de credenciais não encontrado em', resolved);
+  } else if (!tryLoadServiceAccountFile(resolved)) {
+    console.error('Firebase: arquivo de credenciais inválido ou incompleto em', resolved);
   }
 }
 
@@ -130,38 +76,33 @@ if (!admin.apps.length) {
       console.log('Firebase Admin SDK inicializado com credenciais do service account');
       console.log('Firebase: projeto', serviceAccount.project_id);
     } else {
-      // Tentar credenciais padrão do ambiente
-      try {
-        admin.initializeApp({
-          credential: admin.credential.applicationDefault(),
-          databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://coletoroficial-default-rtdb.firebaseio.com'
-        });
-        console.log('Firebase Admin SDK inicializado com applicationDefault()');
-      } catch (e) {
-        console.warn('Firebase: falha ao inicializar com applicationDefault():', e.message);
-      }
+      console.error('Firebase Admin SDK não inicializado: configure um service account válido em FIREBASE_CREDENTIALS_PATH no api/.env');
     }
   } catch (error) {
     console.error('Erro ao inicializar Firebase Admin SDK:', error.message);
   }
 }
 
-const auth = admin.auth();
+const auth = serviceAccount ? admin.auth() : null;
 let firestore = null;
 
 // Tentar inicializar Firestore com tratamento de erro
-try {
-  firestore = admin.firestore();
-  
-  // Configurar explicitamente as configurações do Firestore
-  firestore.settings({
-    ignoreUndefinedProperties: true,
-    timestampsInSnapshots: true
-  });
-  console.log('Configurações do Firestore aplicadas com sucesso');
-} catch (error) {
-  console.warn('Firestore não pôde ser inicializado:', error.message);
-  firestore = null;
+if (serviceAccount) {
+  try {
+    firestore = admin.firestore();
+    
+    // Configurar explicitamente as configurações do Firestore
+    firestore.settings({
+      ignoreUndefinedProperties: true,
+      timestampsInSnapshots: true
+    });
+    console.log('Configurações do Firestore aplicadas com sucesso');
+  } catch (error) {
+    console.warn('Firestore não pôde ser inicializado:', error.message);
+    firestore = null;
+  }
+} else {
+  console.warn('Firestore não inicializado: credenciais do Firebase Admin ausentes ou inválidas no api/.env');
 }
 
 // Testar/atualizar conexão com Firestore (rechecagem periódica)
@@ -205,7 +146,7 @@ if (usingServiceAccount) {
   refreshFirestoreAvailability();
   setInterval(refreshFirestoreAvailability, 60000); // rechecagem a cada 60s
 } else {
-  console.warn('Firestore: pulando verificações periódicas por não haver service account válido. Configure FIREBASE_CREDENTIALS_PATH ou FIREBASE_SERVICE_ACCOUNT_JSON.');
+  console.warn('Firestore: pulando verificações periódicas por não haver service account válido em FIREBASE_CREDENTIALS_PATH.');
 }
 
 // Função helper para verificar se Firestore está disponível

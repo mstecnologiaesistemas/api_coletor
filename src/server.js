@@ -111,11 +111,21 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = config.port;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`📱 Ambiente: ${config.nodeEnv}`);
   console.log(`🛡️ Rate limit: ${config.rateLimit?.enabled ? 'ativo' : 'desativado'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+});
+
+server.on('error', (error) => {
+  if (error?.code === 'EADDRINUSE') {
+    console.error(`Porta ${PORT} já está em uso. Finalize a instância atual ou altere PORT no arquivo .env da API.`);
+    process.exit(1);
+  }
+
+  console.error('Falha ao iniciar servidor:', error);
+  process.exit(1);
 });
 
 module.exports = app;
