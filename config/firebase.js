@@ -47,15 +47,32 @@ function tryLoadServiceAccountFile(filePath) {
   }
 }
 
-const credPath = String(process.env.FIREBASE_CREDENTIALS_PATH || '').trim();
-if (!credPath) {
-  console.error('Firebase: FIREBASE_CREDENTIALS_PATH não definido no api/.env');
-} else {
-  const resolved = path.isAbsolute(credPath) ? credPath : path.resolve(process.cwd(), credPath);
-  if (!fs.existsSync(resolved)) {
-    console.error('Firebase: arquivo de credenciais não encontrado em', resolved);
-  } else if (!tryLoadServiceAccountFile(resolved)) {
-    console.error('Firebase: arquivo de credenciais inválido ou incompleto em', resolved);
+// 1º - Tenta usar o JSON armazenado na variável de ambiente
+const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+if (serviceAccountJson) {
+  try {
+    const raw = JSON.parse(serviceAccountJson);
+    tryUseServiceAccount(raw, 'FIREBASE_SERVICE_ACCOUNT_JSON');
+  } catch (e) {
+    console.error('Firebase: JSON inválido em FIREBASE_SERVICE_ACCOUNT_JSON:', e.message);
+  }
+}
+
+// 2º - Caso não exista, tenta carregar pelo caminho do arquivo (uso local)
+if (!serviceAccount) {
+  const credPath = String(process.env.FIREBASE_CREDENTIALS_PATH || '').trim();
+
+  if (credPath) {
+    const resolved = path.isAbsolute(credPath)
+      ? credPath
+      : path.resolve(process.cwd(), credPath);
+
+    if (!fs.existsSync(resolved)) {
+      console.error('Firebase: arquivo de credenciais não encontrado em', resolved);
+    } else {
+      tryLoadServiceAccountFile(resolved);
+    }
   }
 }
 
