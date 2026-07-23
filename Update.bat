@@ -20,7 +20,7 @@ set "TEMP=%TEMP%\ApiColetor_Update"
 
 set "ZIP=%TEMP%\api.zip"
 
-set "LOG=%DESTINO%Atualizacao.log"
+set "LOG=%DESTINO%\Atualizacao.log"
 
 ::=====================================================
 :: LOG
@@ -43,9 +43,9 @@ echo.
 
 echo Parando servico...
 
-if exist "%DESTINO%nssm.exe" (
+if exist "%DESTINO%\nssm.exe" (
 
-    "%DESTINO%nssm.exe" stop %SERVICO%
+    "%DESTINO%\nssm.exe" stop %SERVICO%
 
     timeout /t 5 >nul
 
@@ -120,7 +120,8 @@ echo.
 echo Atualizando arquivos...
 
 robocopy "%ORIGEM%" "%DESTINO%" ^
- /MIR ^
+ /E ^
+ /PURGE ^
  /R:2 ^
  /W:2 ^
  /FFT ^
@@ -128,7 +129,7 @@ robocopy "%ORIGEM%" "%DESTINO%" ^
  /COPY:DAT ^
  /DCOPY:DAT ^
  /XD ".git" "logs" "data" ^
- /XF ".env" "config.json" "Atualizacao.log" "Update.bat"
+ /XF ".env" "config.json" "Atualizacao.log" "Update.bat" "nssm.exe"
 
 set RC=%ERRORLEVEL%
 
@@ -175,9 +176,9 @@ if exist "%DESTINO%package.json" (
 echo.
 echo Reiniciando servico...
 
-if exist "%DESTINO%nssm.exe" (
+if exist "%DESTINO%\nssm.exe" (
 
-    "%DESTINO%nssm.exe" start %SERVICO%
+    "%DESTINO%\nssm.exe" start %SERVICO%
 
 )
 
