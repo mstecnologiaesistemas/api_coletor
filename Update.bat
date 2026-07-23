@@ -129,7 +129,7 @@ robocopy "%ORIGEM%" "%DESTINO%" ^
  /COPY:DAT ^
  /DCOPY:DAT ^
  /XD ".git" "logs" "data" ^
- /XF ".env" "config.json" "Atualizacao.log" "Update.bat" "nssm.exe"
+ /XF ".env" "config.json" "Atualizacao.log" "Update.bat" "Instalar_Servico.bat" "nssm.exe"
 
 set RC=%ERRORLEVEL%
 
@@ -170,15 +170,29 @@ if exist "%DESTINO%package.json" (
 )
 
 ::=====================================================
-:: REINICIAR SERVICO
+:: EXECUTAR INSTALADOR DO SERVICO
 ::=====================================================
 
 echo.
-echo Reiniciando servico...
+echo Executando instalador do servico...
 
-if exist "%DESTINO%\nssm.exe" (
+if exist "%DESTINO%\Instalar_Servico.bat" (
 
-    "%DESTINO%\nssm.exe" start %SERVICO%
+    call "%DESTINO%\Instalar_Servico.bat"
+
+    if errorlevel 1 (
+        echo.
+        echo Erro ao executar Instalar_Servico.bat
+        echo Falha ao executar Instalar_Servico.bat>>"%LOG%"
+        goto ERRO
+    )
+
+) else (
+
+    echo.
+    echo Arquivo Instalar_Servico.bat nao encontrado.
+    echo Instalar_Servico.bat nao encontrado>>"%LOG%"
+    goto ERRO
 
 )
 
