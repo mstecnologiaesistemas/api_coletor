@@ -148,6 +148,43 @@ if not exist "%BASE_DIR%\src\server.js" (
 )
 
 :: =====================================================
+:: CRIAR ARQUIVO .ENV
+:: =====================================================
+
+if not exist "%BASE_DIR%\.env" (
+
+    echo.
+    echo Criando arquivo .env...
+
+    (
+    echo PORT=3000
+    echo NODE_ENV=PRODUCAO
+    echo.
+    echo # Obrigatorio: defina uma chave forte e unica. O valor de exemplo abaixo e invalido.
+    echo JWT_SECRET=MINHA_KEY_PARA_ACESSO_A_API
+    echo JWT_EXPIRES_IN=24h
+    echo JWT_REFRESH_EXPIRES_IN=7d
+    echo.
+    echo # Obrigatorio para habilitar a limpeza global protegida via /api/inventory/all
+    echo GLOBAL_PURGE_SECRET=SENHALIMPARBASES
+    echo.
+    echo CORS_ORIGIN=*
+    echo.
+    echo # Recomenda-se usar caminho relativo a partir da pasta /api
+    echo DB_PATH=./data/database.sqlite
+    echo.
+    echo # Em desenvolvimento o rate limit ja fica desligado por padrao.
+    echo # Use true ou false para sobrescrever esse comportamento.
+    echo RATE_LIMIT_ENABLED=true
+    ) > "%BASE_DIR%\.env"
+
+    echo Arquivo .env criado.
+
+) else (
+    echo Arquivo .env ja existe. Mantendo configuracao atual.
+)
+
+:: =====================================================
 :: INSTALAR DEPENDENCIAS
 :: =====================================================
 
